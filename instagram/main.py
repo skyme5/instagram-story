@@ -201,8 +201,13 @@ def main():
     parser = argparse.ArgumentParser(description='Instagram Story downloader')
 
     parser.add_argument('-f', '--config-location',
+                        type=str,
                         help='Path for loading and storing config key file. '
                         'Defaults to ' + default_config())
+
+    parser.add_argument('-s', '--save-list',
+                        action='store_true',
+                        help='Save the list of files downloaded to text file.')
 
     args = parser.parse_args()
 

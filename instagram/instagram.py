@@ -60,7 +60,7 @@ class Instagram:
         endpoint = "https://i.instagram.com/api/v1/feed/reels_tray/"
         response = self.session.get(endpoint, timeout=60)
         if response.status_code != requests.codes.ok:
-            logging.error("Status Code {} Error.", response.status_code)
+            logging.error("Status Code {} Error." % response.status_code)
             response.raise_for_status()
         return response
 
@@ -79,7 +79,7 @@ class Instagram:
         )
         response = self.session.get(endpoint, timeout=60)
         if response.status_code != requests.codes.ok:
-            logging.error("Status Code {} Error.", response.status_code)
+            logging.error("Status Code {} Error." % response.status_code)
             response.raise_for_status()
         return response
 
@@ -104,7 +104,7 @@ class Instagram:
         return users
 
     def history_save_filenames(self, string):
-        if self.options.save_cache:
+        if self.options.save_list:
             with open("instagram-story_cache.txt", "a+") as archive:
                 archive.write(string + "\n")
 
@@ -118,7 +118,7 @@ class Instagram:
         Returns:
             None
         """
-        logging.debug("saving url {} => {}", url, dest)
+        logging.debug(f'saving url {url} => {dest}')
 
         try:
             if os.path.getsize(dest) == 0:
@@ -133,8 +133,7 @@ class Instagram:
             with open(dest, "xb") as handle:
                 response = self.session.get(url, stream=True, timeout=160)
                 if response.status_code != requests.codes.ok:
-                    logging.error("Status Code {} Error.",
-                                  response.status_code)
+                    logging.error(f'Status Code {response.status_code} Error.')
                     response.raise_for_status()
                 for data in response.iter_content(chunk_size=4194304):
                     handle.write(data)
