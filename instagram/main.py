@@ -184,6 +184,7 @@ def download_stories(config, options):
         save_json(timestamp=reeltime, content_type='reel_' + str(user),
                   content=ujson, dirpath=config['json_backup'])
         instagram.download_user_reel(ujson)
+        time.sleep(1)
 
     logging.info('Finished downloading stoeies for user: '
                  + config["username"])
