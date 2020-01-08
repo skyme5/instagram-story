@@ -1,6 +1,5 @@
 import json
 import logging
-import sys
 import time
 from datetime import datetime
 import os
@@ -14,19 +13,26 @@ from tqdm import tqdm
 from .instagram import Instagram
 
 
-def format_time(timestamp, time_fmt):
-    return datetime.utcfromtimestamp(timestamp).strftime(time_fmt)
+def format_time(time_stamp, time_fmt):
+    return datetime.utcfromtimestamp(time_stamp).strftime(time_fmt)
 
 
-timestamp = time.time()
-filename = format_time(timestamp, 'instagram-story-%Y-%m-%d_%H-%M-%S.log')
-logging.basicConfig(filename=filename, level=logging.DEBUG,
+log_filename = '/.instagram-story/instagram-story-%Y-%m-%d_%H-%M-%S.log'
+log_filepath = os.environ['HOME'] + log_filename
+log_filename_fmt = format_time(time.time(), log_filepath)
+logging.basicConfig(filename=log_filename_fmt, level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%dT%H:%M:%S')
 
 
-def default_config():
-    return 'instagram-story.config.json'
+def default_config_file():
+    home = os.environ['HOME']
+    return home + '/.instagram-story/config.json'
+
+
+def default_include_file():
+    home = os.environ['HOME']
+    return home + '/.instagram-story/include.txt'
 
 
 def archive_json():
@@ -101,7 +107,7 @@ def ask_user_config():
     ]
     logging.info('Saving config.')
 
-    with open(default_config(), 'tw+') as f:
+    with open(default_config_file(), 'tw+') as f:
         json.dump(config, f)
 
     return config
@@ -134,21 +140,38 @@ def validate_config(json_data):
     return True
 
 
+def get_include_list():
+    if(os.path.isfile(default_include_file())):
+        try:
+            with open(default_include_file()) as f:
+                include_list = f.read().split("\n")
+                include_list = [int(a) for a in include_list]
+                return include_list
+        except IOError:
+            return []
+    else:
+        return []
+
+
 def get_config(config_file):
-    if(os.path.isfile(config_file)):
+    if os.path.isfile(config_file):
         try:
             with open(config_file) as f:
                 json_data = json.load(f)
                 if validate_config(json_data):
-                    return json_data
+                    config = {
+                        'users': json_data,
+                        'include': get_include_list()
+                    }
+                    return config
+                else:
+                    raise Exception('json_data validate error')
 
         except IOError:
             raise Exception(f'unable to read {config_file}')
-            sys.exit(1)
 
         except json.decoder.JSONDecodeError:
             raise Exception(f'unable to parse {config_file} as json')
-            sys.exit(1)
     else:
         logger.info(
             f'Creating {config_file} file in the current directory'
@@ -156,13 +179,12 @@ def get_config(config_file):
         return ask_user_config()
 
 
-def download_stories(config, options):
-    print(f'Downloading stories for {config["username"]}')
+def download_stories(config, download, options):
     logging.info('Initializing module')
 
     instagram = Instagram(config, options)
 
-    logging.info(f'Fetching stories for user: {config["username"]}')
+    logging.info('Fetching stories for user: %s', config["username"])
 
     traytime = int(time.time())
 
@@ -171,11 +193,15 @@ def download_stories(config, options):
     save_json(timestamp=traytime, content_type='tray', content=storyjson,
               dirpath=config['json_backup'])
 
-    logging.info(f'Found {len(storyjson)} stories for'
-                 f' user: {config["username"]}')
+    logging.info('Found %s stories for user: %s',
+                 len(storyjson), config["username"])
 
     instagram.download_user_tray(storyjson)
-    users = instagram.get_users_id(storyjson)
+    users_list = instagram.get_users_id(storyjson)
+    users = [a for a in users_list if a in download]
+
+    print('Downloading stories for %s %s/%s', config["username"]
+          {len(users), len(users_list))
 
     for user in tqdm(users):
         reeltime = int(time.time())
@@ -186,8 +212,8 @@ def download_stories(config, options):
         instagram.download_user_reel(ujson)
         time.sleep(1)
 
-    logging.info('Finished downloading stoeies for user: '
-                 + config["username"])
+    logging.info('Finished downloading stoeies for user: %s',
+                 config["username"])
 
 
 def main():
@@ -204,21 +230,26 @@ def main():
     parser.add_argument('-f', '--config-location',
                         type=str,
                         help='Path for loading and storing config key file. '
-                        'Defaults to ' + default_config())
+                        'Defaults to ' + default_config_file())
 
-    parser.add_argument('-s', '--save-list',
-                        action='store_true',
-                        help='Save the list of files downloaded to text file.')
+    parser.add_argument('-d', '--download-only',
+                        type=str,
+                        help='Download stories listed in the file'
+                        'Defaults to ' + default_include_file())
 
     args = parser.parse_args()
 
     if args.config_location is not None:
         config_file = args.config_location
     else:
-        config_file = default_config()
+        config_file = default_config_file()
 
-    for config in get_config(config_file):
-        download_stories(config=config, options=args)
+    config = get_config(config_file)
+    user_config = config.get('users')
+    for user in user_config:
+        if user.get('download'):
+            download_stories(config=user, download=config.get('include'),
+                             options=args)
 
     logging.info('Shutting down application.')
 

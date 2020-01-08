@@ -60,8 +60,9 @@ class Instagram:
         endpoint = "https://i.instagram.com/api/v1/feed/reels_tray/"
         response = self.session.get(endpoint, timeout=60)
         if response.status_code != requests.codes.ok:
-            logging.error("Status Code {} Error." % response.status_code)
+            logging.error("Status Code %s Error.", response.status_code)
             response.raise_for_status()
+
         return response
 
     def get_reel_media(self, user):
@@ -79,7 +80,7 @@ class Instagram:
         )
         response = self.session.get(endpoint, timeout=60)
         if response.status_code != requests.codes.ok:
-            logging.error("Status Code {} Error." % response.status_code)
+            logging.error("Status Code %s Error.", response.status_code)
             response.raise_for_status()
         return response
 
@@ -104,9 +105,8 @@ class Instagram:
         return users
 
     def history_save_filenames(self, string):
-        if self.options.save_list:
-            with open("instagram-story_cache.txt", "a+") as archive:
-                archive.write(string + "\n")
+        with open(os.environ['HOME'] + "/.instagram-story/cache.txt", "a+") as archive:
+            archive.write(string + "\n")
 
     def download_file(self, url: str, dest: str):
         """Download file and save to destination
