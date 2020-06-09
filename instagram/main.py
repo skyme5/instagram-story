@@ -58,24 +58,24 @@ def archive_json():
         os.remove(path)
 
 
-def save_json(timestamp: int, content_type: str, content: dict, dirpath: str):
+def save_json(timestamp: int, content_type: str, content: dict, prefix: str):
     """Save JSON file
 
     Args:
         timestamp: Unix timestamp
         content_type: Name
         content: JSON data
-        dirpath: Prefix path to save json
+        prefix: Prefix path to save json
 
     Returns:
         None
     """
 
     utcdatetime = format_time(timestamp, time_fmt='%Y-%m-%d_%H-%M-%S')
-    utcyear = format_time(timestamp, time_fmt='%Y')
+    folder = format_time(timestamp, time_fmt='%Y-%m-%d')
 
     filename = "{}_{}.json".format(utcdatetime, content_type)
-    path = os.path.join(dirpath, utcyear, filename)
+    path = os.path.join(prefix, folder, filename)
 
     dirpath = os.path.dirname(path)
 
@@ -141,7 +141,7 @@ def validate_config(json_data):
 
 
 def get_include_list():
-    if(os.path.isfile(default_include_file())):
+    if os.path.isfile(default_include_file()):
         try:
             with open(default_include_file()) as f:
                 include_list = f.read().split("\n")
@@ -171,11 +171,9 @@ def get_config(config_file):
             raise Exception(f'unable to read {config_file}')
 
         except json.decoder.JSONDecodeError:
-            raise Exception(f'unable to parse {config_file} as json')
+            raise Exception(f'unable to parse {config_file} as json',)
     else:
-        logger.info(
-            f'Creating {config_file} file in the current directory'
-        )
+        logger.info('Creating {} file in the current directory', config_file)
         return ask_user_config()
 
 
@@ -184,36 +182,36 @@ def download_stories(config, download, options):
 
     instagram = Instagram(config, options)
 
-    logging.info('Fetching stories for user: %s', config["username"])
+    logging.info("Fetching stories for user: %s", config["username"])
 
     traytime = int(time.time())
 
     storyjson = instagram.get_user_stories().json()
 
     save_json(timestamp=traytime, content_type='tray', content=storyjson,
-              dirpath=config['json_backup'])
+              prefix=config['json_backup'])
 
-    logging.info('Found %s stories for user: %s',
-                 len(storyjson), config["username"])
+    logging.info("Found %s stories for user: %s", len(storyjson), config["username"])
 
     instagram.download_user_tray(storyjson)
     users_list = instagram.get_users_id(storyjson)
     users = [a for a in users_list if a in download]
+    users_ignored = instagram.get_ignored_users(storyjson, download)
 
-    print('Downloading stories for %s %s/%s', config["username"]
-          {len(users), len(users_list))
+    print('Downloading stories for {} ({}/{})'.format(config["username"], len(users), len(users_list)))
 
     for user in tqdm(users):
         reeltime = int(time.time())
         uresp = instagram.get_users_stories_reel(user)
         ujson = uresp.json()
         save_json(timestamp=reeltime, content_type='reel_' + str(user),
-                  content=ujson, dirpath=config['json_backup'])
+                  content=ujson, prefix=config['json_backup'])
         instagram.download_user_reel(ujson)
         time.sleep(1)
 
-    logging.info('Finished downloading stoeies for user: %s',
-                 config["username"])
+    logging.warning("Following users were ignored: %s", ', '.join(users_ignored))
+    logging.info("Finished downloading stoeies for user: %s", config["username"])
+
 
 
 def main():

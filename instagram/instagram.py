@@ -59,7 +59,7 @@ class Instagram:
         """
         endpoint = "https://i.instagram.com/api/v1/feed/reels_tray/"
         response = self.session.get(endpoint, timeout=60)
-        if response.status_code != requests.codes.ok:
+        if response.status_code != requests.codes.ok: #pylint: disable=no-member
             logging.error("Status Code %s Error.", response.status_code)
             response.raise_for_status()
 
@@ -79,7 +79,7 @@ class Instagram:
             str(user) + "/reel_media/"
         )
         response = self.session.get(endpoint, timeout=60)
-        if response.status_code != requests.codes.ok:
+        if response.status_code != requests.codes.ok: #pylint: disable=no-member
             logging.error("Status Code %s Error.", response.status_code)
             response.raise_for_status()
         return response
@@ -90,7 +90,7 @@ class Instagram:
     def get_users_stories_reel(self, user):
         return self.get_reel_media(user)
 
-    def get_users_id(self, tray: dict) -> list:
+    def get_users_id(self, tray: dict):
         """Extract user IDs from reel tray JSON.
 
         Args:
@@ -101,7 +101,27 @@ class Instagram:
         """
         users = []
         for user in tray["tray"]:
-            users.append(user["user"]["pk"])
+            if "user" in user:
+                if "pk" in user["user"]:
+                    users.append(user["user"]["pk"])
+        return users
+
+    def get_ignored_users(self, tray: dict, download: list) -> list:
+        """Extract user IDs from reel tray JSON.
+
+        Args:
+            tray: Reel tray response from IG
+
+        Returns:
+            List of user IDs
+        """
+        users = []
+        for user in tray["tray"]:
+            if "user" in user:
+                if "pk" in user["user"]:
+                    user_id = user["user"]["pk"]
+                    if user_id not in download:
+                        users.append('{} ({})'.format(user["user"]["username"], user_id))
         return users
 
     def history_save_filenames(self, string):
@@ -118,7 +138,7 @@ class Instagram:
         Returns:
             None
         """
-        logging.debug(f'saving url {url} => {dest}')
+        logging.debug("saving url %s => %s", url, dest)
 
         try:
             if os.path.getsize(dest) == 0:
@@ -132,8 +152,8 @@ class Instagram:
             os.makedirs(dirpath, exist_ok=True)
             with open(dest, "xb") as handle:
                 response = self.session.get(url, stream=True, timeout=160)
-                if response.status_code != requests.codes.ok:
-                    logging.error(f'Status Code {response.status_code} Error.')
+                if response.status_code != requests.codes.ok: #pylint: disable=no-member
+                    logging.error("Status Code %s Error.", response.status_code)
                     response.raise_for_status()
                 for data in response.iter_content(chunk_size=4194304):
                     handle.write(data)
