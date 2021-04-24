@@ -143,7 +143,7 @@ def main():
         "-d",
         "--download-only",
         type=str,
-        help="Download stories listed in the file"
+        help="Download stories listed in the file. "
         "Defaults to " + home_path(CONFIG_PATH_INCLUDE),
     )
 
