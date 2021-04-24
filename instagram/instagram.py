@@ -1,95 +1,108 @@
 """Instagram class to handle requests to Instagram"""
-
 import json
-import os
-from datetime import datetime
 import logging
+import os
+import pickle
+import time
+from datetime import datetime
 
 import requests
 
+from .constants import ENDPOINT_REELS_TRAY
+from .constants import ENDPOINT_USER_REELS
+from .constants import MEDIA_TYPE_EXT
+from .utils import dump_text_file
+from .utils import format_time
+from .utils import home_path
+
 
 class Instagram:
-    """This class sets up Instagram class than handles requests
-    that fetch data from instagram.com using the provided cookie
-    """
+    """Instagram class for handling API requests and downloading files."""
 
     def __init__(self, config, options):
-        """This sets up this class to communicate with Instagram.
-
-        Args:
-            cookie: A dictionary object with the required cookie values
-            (ds_user_id, sessionid, csrftoken).
-        """
+        """Initialize class variables."""
+        self.log = logging.getLogger(__name__)
         self.options = options
-        self.media_directory = config["media_directory"]
-        self.userid = config["cookie"]["ds_user_id"]
-        self.sessionid = config["cookie"]["sessionid"]
-        self.csrftoken = config["cookie"]["csrftoken"]
-        self.mid = config["cookie"]["mid"]
+        self.directory = config["media_directory"]
+        self.id = config["id"]
+        self.cookie = config["headers"]["cookie"]
+        self.cj_path = home_path(".instagram-story", "cookie-{}".format(self.id))
 
-        cookie = "ds_user_id={}; sessionid={}; csrftoken={}; mid={} dnt: 1"
         self.headers = {
             "accept": "*/*",
             "accept-encoding": "gzip, deflate",
             "accept-language": "en-US",
             "content_type": "application/x-www-form-urlencoded; charset=UTF-8",
             "cache-control": "no-cache",
-            "cookie": cookie.format(self.userid, self.sessionid,
-                                    self.csrftoken, self.mid),
-            # "pragma" : "no-cache",
-            # "referer" : "https://www.instagram.com/",
             "user-agent": (
-                "Instagram 10.26.0 (iPhone7,2; iOS 10_1_1;"
-                " en_US; en-US; scale=2.00; gamut=normal;"
-                " 750x1334) AppleWebKit/420+"
+                "Mozilla/5.0 (Linux; Android 8.1.0; motorola one Build/OPKS28.63-18-3; wv)"
+                " AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0"
+                " Chrome/70.0.3538.80 Mobile Safari/537.36"
+                " Instagram 72.0.0.21.98"
+                " Android (27/8.1.0; 320dpi; 720x1362; motorola; motorola one;"
+                " deen_sprout; qcom; pt_BR; 132081645)"
             ),
-            "x-ig-capabilities": "36oD",
-            # "x-ig-connection-type" : "WIFI",
-            # "x-ig-fb-http-engine" : "Liger"
         }
 
         self.session = requests.Session()
         self.session.headers = self.headers
+        self.session.headers.update({"cookie": self.cookie})
 
-    def get_reel_tray(self):
-        """Get reel tray from API.
+    def _cj_load(self):
+        """Load cookies from file."""
+        if os.path.exists(self.cj_path):
+            with open(self.cj_path, "rb") as f:
+                self.session.cookies.update(pickle.load(f))
 
-        Returns:
-            Response object with reel tray API response
+    def _cj_dump(self):
+        """Save Cookies to file."""
+        with open(self.cj_path, "wb") as f:
+            pickle.dump(self.session.cookies, f)
+
+    def _api_request(self, endpoint):
+        """Get reel tray for logged in user from Instagram API.
+
+        Returns: Reel tray response object
         """
-        endpoint = "https://i.instagram.com/api/v1/feed/reels_tray/"
+        self.log.debug("Making API request %s", endpoint)
         response = self.session.get(endpoint, timeout=60)
-        if response.status_code != requests.codes.ok:
-            logging.error("Status Code {} Error.", response.status_code)
+        if response.status_code != requests.codes.ok:  # pylint: disable=no-member
+            self.log.error(
+                "Status Code %s Error for %s.", response.status_code, endpoint
+            )
             response.raise_for_status()
         return response
 
-    def get_reel_media(self, user):
-        """Get reel media of a user from API.
+    def get_tray(self):
+        """Get reel tray from Instagram API.
 
-        Args:
-            user: User ID
+        Returns: Reel tray response object
+        """
+        self.reels_tray = self._api_request(ENDPOINT_REELS_TRAY).json()
+        return self.reels_tray
+
+    def get_reel(self, user_id: str):
+        """Get reel tray from Instagram API.
+
+        Returns: Reel tray response object
+        """
+        response = self._api_request(ENDPOINT_USER_REELS + user_id)
+        return response.json().get("reels").get(user_id)
+
+    def user_ids(self) -> list:
+        """Extract user IDs from reel tray JSON.
 
         Returns:
-            Response object with reel media API response
+            List of user IDs
         """
-        endpoint = (
-            "https://i.instagram.com/api/v1/feed/user/" +
-            str(user) + "/reel_media/"
-        )
-        response = self.session.get(endpoint, timeout=60)
-        if response.status_code != requests.codes.ok:
-            logging.error("Status Code {} Error.", response.status_code)
-            response.raise_for_status()
-        return response
+        users = []
+        for item in self.reels_tray["tray"]:
+            if "user" in item:
+                if "pk" in item["user"]:
+                    users.append(str(item["user"]["pk"]))
+        return users
 
-    def get_user_stories(self):
-        return self.get_reel_tray()
-
-    def get_users_stories_reel(self, user):
-        return self.get_reel_media(user)
-
-    def get_users_id(self, tray: dict) -> list:
+    def ignored_users(self, download_ids: list) -> list:
         """Extract user IDs from reel tray JSON.
 
         Args:
@@ -99,14 +112,20 @@ class Instagram:
             List of user IDs
         """
         users = []
-        for user in tray["tray"]:
-            users.append(user["user"]["pk"])
+        for item in self.reels_tray["tray"]:
+            if "user" in item:
+                user_id = item["user"]["pk"]
+                username = item["user"]["username"]
+                if user_id not in download_ids:
+                    users.append("{} ({})".format(username, user_id))
         return users
 
-    def history_save_filenames(self, string):
-        if self.options.save_cache:
-            with open("instagram-story_cache.txt", "a+") as archive:
-                archive.write(string + "\n")
+    def dump_filename(self, string):
+        filename = format_time(time.time(), "cache-%Y-%m-%d_%H.log")
+        with open(
+            os.path.join(os.environ["HOME"], ".instagram-story", filename), "a+"
+        ) as archive:
+            archive.write(string + "\n")
 
     def download_file(self, url: str, dest: str):
         """Download file and save to destination
@@ -118,11 +137,11 @@ class Instagram:
         Returns:
             None
         """
-        logging.debug("saving url {} => {}", url, dest)
+        self.log.debug("saving url %s => %s", url, dest)
 
         try:
             if os.path.getsize(dest) == 0:
-                logging.info("Empty file exists. Removing.")
+                self.log.info("Empty file exists. Removing.")
                 os.remove(dest)
         except FileNotFoundError:
             pass
@@ -132,41 +151,39 @@ class Instagram:
             os.makedirs(dirpath, exist_ok=True)
             with open(dest, "xb") as handle:
                 response = self.session.get(url, stream=True, timeout=160)
-                if response.status_code != requests.codes.ok:
-                    logging.error("Status Code {} Error.",
-                                  response.status_code)
+                if (
+                    response.status_code != requests.codes.ok
+                ):  # pylint: disable=no-member
+                    self.log.error("Status Code %s Error.", response.status_code)
                     response.raise_for_status()
                 for data in response.iter_content(chunk_size=4194304):
                     handle.write(data)
                 handle.close()
 
-            self.history_save_filenames(dest)
+            self.dump_filename(dest)
         except FileExistsError:
-            logging.info("File already exists.")
+            self.log.info("File already exists.")
         # This is the correct syntax
         except requests.exceptions.RequestException:
-            logging.info("Connection was closed")
+            self.log.info("Connection was closed")
 
         if os.path.getsize(dest) == 0:
-            logging.info("Error downloading. Removing.")
+            self.log.info("Error downloading. Removing.")
             os.remove(dest)
 
-    def format_time(self, timestamp, time_fmt):
-        return datetime.utcfromtimestamp(timestamp).strftime(time_fmt)
-
-    def format_filepath(self,
-                        user: str,
-                        pk: int,
-                        timestamp: int,
-                        post_id: str,
-                        media_type: int,
-                        content: dict,
-                        ) -> str:
+    def format_filepath(
+        self,
+        user_id: int,
+        timestamp: int,
+        post_id: str,
+        media_type: int,
+        content: dict,
+    ) -> str:
         """Format download path to a specific format/template
 
         Args:
             user: User name
-            pk: User ID
+            user_id: User ID
             timestamp: UTC Unix timestamp
             post_id: Post ID
             media_type: Media type as defined by IG
@@ -175,92 +192,49 @@ class Instagram:
             None
         """
 
-        utcdatetime = self.format_time(timestamp, time_fmt="%Y-%m-%d_%H-%M-%S")
-        utcyear = self.format_time(timestamp, time_fmt="%Y")
+        utcdatetime = format_time(timestamp, time_fmt="%Y-%m-%d_%H-%M-%S")
+        utcyear = format_time(timestamp, time_fmt="%Y")
 
-        if media_type == 1:
-            ext = ".jpg"
-        elif media_type == 2:
-            ext = ".mp4"
-        elif media_type == 3:
-            ext = ".json"
+        ext = MEDIA_TYPE_EXT[media_type]
+        path_prefix = os.path.join(self.directory, str(user_id), utcyear)
 
-        filename = utcdatetime + " " + post_id + ".json"
-
-        dirpath = os.path.join(self.media_directory, str(pk), utcyear)
-
-        jsonfilepath = os.path.join(dirpath, filename)
-
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
-
-        if not os.path.exists(jsonfilepath):
-            f = open(jsonfilepath, "w+")
-            json.dump(content, f)
-            f.close()
-
-        path = os.path.join(
-            self.media_directory, str(pk), utcyear,
-            utcdatetime + " " + post_id + ext
+        json_filepath = os.path.join(
+            path_prefix, "{} {}.json".format(utcdatetime, post_id)
         )
+
+        dump_text_file(json.dumps(content), json_filepath)
+
+        filename = "{} {}{}".format(utcdatetime, post_id, ext)
+        path = os.path.join(path_prefix, filename)
 
         return path
 
-    def get_largest_image(self, item, largest):
-        return item["image_versions2"]["candidates"][largest]
-
-    def download_user_reel(self, resp):
-        """Download stories of a followed user's tray.
-
-        Download the stories of a followed user.
+    def download_reel(self, tray):
+        """Download story from tray.
 
         Args:
-            resp: JSON dictionary of reel from IG API
-
-        Returns:
-            None
+            tray: Reel response object from API.
         """
+
+        username = tray["user"]["username"]
+        user_id = tray["user"]["pk"]
         try:
-            for item in resp["items"]:
-                username = item["user"]["username"]
-                post_pk = item["user"]["pk"]
-                timestamp = item["taken_at"]
+            for item in tray["items"]:
                 post_id = item["id"]
+                timestamp = item["taken_at"]
                 media_type = item["media_type"]
                 if media_type == 2:  # Video
-                    largest = 0
-                    for version, video in enumerate(item["video_versions"]):
-                        item_size = video["width"] * video["height"]
-                        largest_size = (
-                            item["video_versions"][largest]["width"]
-                            * item["video_versions"][largest]["height"]
-                        )
-                        if item_size > largest_size:
-                            largest = version
-
-                    url = item["video_versions"][largest]["url"]
+                    url = item["video_versions"][0]["url"]
 
                 elif media_type == 1:  # Image
-                    largest = 0
-                    candidates = item["image_versions2"]["candidates"]
-                    for version, image in enumerate(candidates):
-                        item_size = image["width"] * image["height"]
-                        largest_item = self.get_largest_image(item, largest)
-                        width = largest_item["width"]
-                        height = largest_item["height"]
-                        largest_size = width * height
-
-                        if item_size > largest_size:
-                            largest = version
-
-                    url = self.get_largest_image(item, largest)["url"]
+                    url = item["image_versions2"]["candidates"][0]["url"]
 
                 else:  # Unknown
                     url = None
                     pass
 
                 path = self.format_filepath(
-                    username, post_pk, timestamp, post_id, media_type, item
+                    user_id, timestamp, post_id, media_type, item
                 )
                 self.download_file(url, path)
 
@@ -268,29 +242,7 @@ class Instagram:
         except KeyError:
             pass
 
-    def download_user_tray(self, resp):
-        """Download stories of logged in user's tray.
-
-        Download the stories as available in the tray. The tray contains a list
-        of reels, a collection of the stories posted by a followed user.
-
-        The tray only contains a small set of reels of the first few users.
-        To download the rest, a reel must be obtained for each user in the
-        tray.
-
-        Args:
-            resp: JSON dictionary of tray from IG API
-
-        Returns:
-            None
-        """
-        for reel in resp["tray"]:
-            self.download_user_reel(reel)
-
     def close(self):
-        """Close seesion to IG
-
-        Returns:
-            None
-        """
+        """Close seesion to IG."""
         self.session.close()
+        self._cj_dump()

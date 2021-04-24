@@ -1,0 +1,17 @@
+[report]
+exclude_lines =
+    except KeyboardInterrupt:
+    except requests.exceptions.RequestException as e:
+    if self.quiet is False:
+    raise FileExistsError
+    raise NoStoriesAvailable
+    return response
+
+[run]
+omit =
+    snapchat_dl/app.py
+    snapchat_dl/cli.py
+    snapchat_dl/version.py
+    setup.py
+    .eggs/*
+    venv/*
