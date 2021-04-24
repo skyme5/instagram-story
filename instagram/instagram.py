@@ -8,20 +8,25 @@ from datetime import datetime
 
 import requests
 
+from .constants import ENDPOINT_REELS_TRAY
+from .constants import ENDPOINT_USER_REELS
+from .constants import MEDIA_TYPE_EXT
+from .utils import dump_text_file
+from .utils import format_time
+from .utils import home_path
+
 
 class Instagram:
-    """This class sets up Instagram class than handles requests
-    that fetch data from instagram.com using the provided cookie
-    """
+    """Instagram class for handling API requests and downloading files."""
 
     def __init__(self, config, options):
-        """This sets up this class to communicate with Instagram."""
+        """Initialize class variables."""
         self.log = logging.getLogger(__name__)
         self.options = options
         self.directory = config["media_directory"]
         self.id = config["id"]
         self.cookie = config["headers"]["cookie"]
-        self.cj_path = self._get_home_path("cookie-{}".format(self.id))
+        self.cj_path = home_path(".instagram-story", "cookie-{}".format(self.id))
 
         self.headers = {
             "accept": "*/*",
@@ -44,57 +49,48 @@ class Instagram:
         self.session.headers.update({"cookie": self.cookie})
 
     def _cj_load(self):
-        # Only attempt to load if the cookie file exists.
+        """Load cookies from file."""
         if os.path.exists(self.cj_path):
             with open(self.cj_path, "rb") as f:
                 self.session.cookies.update(pickle.load(f))
 
     def _cj_dump(self):
+        """Save Cookies to file."""
         with open(self.cj_path, "wb") as f:
             pickle.dump(self.session.cookies, f)
 
-    def _get_home_path(self, filename):
-        return os.path.join(os.environ["HOME"], ".instagram-story", filename)
-
-    def _get_reels_tray(self):
-        """Get reel tray from Instagram API.
+    def _api_request(self, endpoint):
+        """Get reel tray for logged in user from Instagram API.
 
         Returns: Reel tray response object
         """
-        endpoint = "https://i.instagram.com/api/v1/feed/reels_tray/"
+        self.log.debug("Making API request %s", endpoint)
         response = self.session.get(endpoint, timeout=60)
         if response.status_code != requests.codes.ok:  # pylint: disable=no-member
-            self.log.error("Status Code %s Error.", response.status_code)
+            self.log.error(
+                "Status Code %s Error for %s.", response.status_code, endpoint
+            )
             response.raise_for_status()
         return response
 
-    def get_reels_tray(self):
+    def get_tray(self):
         """Get reel tray from Instagram API.
 
         Returns: Reel tray response object
         """
-        self.reels_tray = self._get_reels_tray().json()
+        self.reels_tray = self._api_request(ENDPOINT_REELS_TRAY).json()
         return self.reels_tray
 
-    def get_user_reel(self, user_id: str):
+    def get_reel(self, user_id: str):
         """Get reel tray from Instagram API.
 
         Returns: Reel tray response object
         """
-        endpoint = "https://i.instagram.com/api/v1/feed/reels_media/?reel_ids="
-        response = self.session.get(endpoint + user_id, timeout=60)
-        if response.status_code != requests.codes.ok:  # pylint: disable=no-member
-            self.log.error("Status Code %s Error.", response.status_code)
-            response.raise_for_status()
-        with open("23.txt", "w", encoding="utf-8") as f:
-            f.write(response.text)
-        return response.json().get("reels").get(str(user_id))
+        response = self._api_request(ENDPOINT_USER_REELS + user_id)
+        return response.json().get("reels").get(user_id)
 
-    def get_user_ids(self) -> list:
+    def user_ids(self) -> list:
         """Extract user IDs from reel tray JSON.
-
-        Args:
-            tray: Reel tray response from IG
 
         Returns:
             List of user IDs
@@ -103,7 +99,7 @@ class Instagram:
         for item in self.reels_tray["tray"]:
             if "user" in item:
                 if "pk" in item["user"]:
-                    users.append(item["user"]["pk"])
+                    users.append(str(item["user"]["pk"]))
         return users
 
     def ignored_users(self, download_ids: list) -> list:
@@ -125,7 +121,7 @@ class Instagram:
         return users
 
     def dump_filename(self, string):
-        filename = self.format_time(time.time(), "cache-%Y-%m-%d_%H.log")
+        filename = format_time(time.time(), "cache-%Y-%m-%d_%H.log")
         with open(
             os.path.join(os.environ["HOME"], ".instagram-story", filename), "a+"
         ) as archive:
@@ -175,12 +171,8 @@ class Instagram:
             self.log.info("Error downloading. Removing.")
             os.remove(dest)
 
-    def format_time(self, timestamp, time_fmt):
-        return datetime.utcfromtimestamp(timestamp).strftime(time_fmt)
-
     def format_filepath(
         self,
-        user: str,
         user_id: int,
         timestamp: int,
         post_id: str,
@@ -200,46 +192,28 @@ class Instagram:
             None
         """
 
-        utcdatetime = self.format_time(timestamp, time_fmt="%Y-%m-%d_%H-%M-%S")
-        utcyear = self.format_time(timestamp, time_fmt="%Y")
+        utcdatetime = format_time(timestamp, time_fmt="%Y-%m-%d_%H-%M-%S")
+        utcyear = format_time(timestamp, time_fmt="%Y")
 
-        if media_type == 1:
-            ext = ".jpg"
-        elif media_type == 2:
-            ext = ".mp4"
-        elif media_type == 3:
-            ext = ".json"
+        ext = MEDIA_TYPE_EXT[media_type]
+        path_prefix = os.path.join(self.directory, str(user_id), utcyear)
 
-        filename = utcdatetime + " " + post_id + ".json"
-
-        dirpath = os.path.join(self.directory, str(user_id), utcyear)
-
-        jsonfilepath = os.path.join(dirpath, filename)
-
-        if not os.path.exists(dirpath):
-            os.makedirs(dirpath)
-
-        if not os.path.exists(jsonfilepath):
-            f = open(jsonfilepath, "w+")
-            json.dump(content, f)
-            f.close()
-
-        path = os.path.join(
-            self.directory, str(user_id), utcyear, utcdatetime + " " + post_id + ext
+        json_filepath = os.path.join(
+            path_prefix, "{} {}.json".format(utcdatetime, post_id)
         )
+
+        dump_text_file(json.dumps(content), json_filepath)
+
+        filename = "{} {}{}".format(utcdatetime, post_id, ext)
+        path = os.path.join(path_prefix, filename)
 
         return path
 
     def download_reel(self, tray):
-        """Download stories of a followed user's tray.
-
-        Download the stories of a followed user.
+        """Download story from tray.
 
         Args:
-            resp: JSON dictionary of reel from IG API
-
-        Returns:
-            None
+            tray: Reel response object from API.
         """
 
         username = tray["user"]["username"]
@@ -250,42 +224,17 @@ class Instagram:
                 timestamp = item["taken_at"]
                 media_type = item["media_type"]
                 if media_type == 2:  # Video
-                    largest = 0
-                    for version, video in enumerate(item["video_versions"]):
-                        item_size = video["width"] * video["height"]
-
-                        largest_item = item["video_versions"][largest]
-                        width = largest_item["width"]
-                        height = largest_item["height"]
-                        largest_size = width * height
-
-                        if item_size > largest_size:
-                            largest = version
-
-                    url = item["video_versions"][largest]["url"]
+                    url = item["video_versions"][0]["url"]
 
                 elif media_type == 1:  # Image
-                    largest = 0
-                    candidates = item["image_versions2"]["candidates"]
-                    for version, image in enumerate(candidates):
-                        item_size = image["width"] * image["height"]
-
-                        largest_item = item["image_versions2"]["candidates"][largest]
-                        width = largest_item["width"]
-                        height = largest_item["height"]
-                        largest_size = width * height
-
-                        if item_size > largest_size:
-                            largest = version
-
-                    url = item["image_versions2"]["candidates"][largest]["url"]
+                    url = item["image_versions2"]["candidates"][0]["url"]
 
                 else:  # Unknown
                     url = None
                     pass
 
                 path = self.format_filepath(
-                    username, user_id, timestamp, post_id, media_type, item
+                    user_id, timestamp, post_id, media_type, item
                 )
                 self.download_file(url, path)
 
@@ -294,10 +243,6 @@ class Instagram:
             pass
 
     def close(self):
-        """Close seesion to IG
-
-        Returns:
-            None
-        """
+        """Close seesion to IG."""
         self.session.close()
         self._cj_dump()
