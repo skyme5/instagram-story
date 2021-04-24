@@ -114,7 +114,7 @@ class Instagram:
         users = []
         for item in self.reels_tray["tray"]:
             if "user" in item:
-                user_id = item["user"]["pk"]
+                user_id = str(item["user"]["pk"])
                 username = item["user"]["username"]
                 if user_id not in download_ids:
                     users.append("{} ({})".format(username, user_id))
