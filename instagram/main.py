@@ -91,23 +91,18 @@ def save_json(timestamp: int, content_type: str, content: dict, prefix: str):
 
 def ask_user_config():
     logging.info("Creating config file")
+    username = input("Enter your instagram username: ")
     user_id = input("Enter your instagram user ID: ")
-    session_id = input("Enter your instagram session ID: ")
-    csrf_token = input("Enter your instagram CSRF token: ")
-    mid = input("Enter your instagram mid: ")
-    media_directory = input(
-        "Enter media save directory " "(default current directory): "
-    )
+    cookie = input("Enter your instagram cookie: ")
+    directory = input("Enter media save directory " "(default current directory): ")
     config = [
         {
-            "cookie": {
-                "ds_user_id": user_id,
-                "sessionid": session_id,
-                "csrftoken": csrf_token,
-                "mid": mid,
-            },
-            "media_directory": media_directory,
-            "json_backup": "json",
+            "username": username,
+            "id": user_id,
+            "directory": directory,
+            "json_backup": os.path.join(directory, "json"),
+            "download": true,
+            "headers": {"cookie": cookie},
         }
     ]
     logging.info("Saving config.")
@@ -124,17 +119,14 @@ def validate_config(json_data):
         "items": {
             "type": "object",
             "properties": {
-                "cookie": {
+                "headers": {
                     "type": "object",
                     "properties": {
-                        "ds_user_id": {"type": "string"},
-                        "sessionid": {"type": "string"},
-                        "csrftoken": {"type": "string"},
-                        "mid": {"type": "string"},
+                        "cookie": {"type": "string"},
                     },
                 },
                 "username": {"type": "string"},
-                "media_directory": {"type": "string"},
+                "directory": {"type": "string"},
                 "json_backup": {"type": "string"},
                 "download": {"type": "boolean"},
             },
@@ -164,7 +156,7 @@ def get_config(config_file):
             with open(config_file) as f:
                 json_data = json.load(f)
                 if validate_config(json_data):
-                    config = {"users": json_data, "include": get_include_list()}
+                    config = {"user_list": json_data, "include": get_include_list()}
                     return config
                 else:
                     raise Exception("json_data validate error")
@@ -190,46 +182,46 @@ def download_stories(config, download, options):
 
     traytime = int(time.time())
 
-    storyjson = instagram.get_user_stories().json()
+    reels_tray = instagram.get_reels_tray()
 
     save_json(
         timestamp=traytime,
         content_type="tray",
-        content=storyjson,
+        content=reels_tray,
         prefix=config["json_backup"],
     )
 
-    logging.info("Found %s stories for user: %s", len(storyjson), config["username"])
+    logging.info(
+        "Found %s stories for user: %s", len(reels_tray["tray"]), config["username"]
+    )
 
-    instagram.download_user_tray(storyjson)
-    users_list = instagram.get_users_id(storyjson)
-    users = [a for a in users_list if a in download]
-    users_ignored = instagram.get_ignored_users(storyjson, download)
+    user_ids_all = instagram.get_user_ids()
+    user_ids = [a for a in user_ids_all if a in download]
+    users_ignored = instagram.ignored_users(download)
 
     print(
         "Downloading stories for {} ({}/{})".format(
-            config["username"], len(users), len(users_list)
+            config["username"], len(user_ids), len(user_ids_all)
         )
     )
 
-    for user in tqdm(users):
-        reeltime = int(time.time())
-        uresp = instagram.get_users_stories_reel(user)
-        if uresp is not False:
-            ujson = uresp.json()
-            save_json(
-                timestamp=reeltime,
-                content_type="reel_" + str(user),
-                content=ujson,
-                prefix=config["json_backup"],
-            )
-            instagram.download_user_reel(ujson)
-            time.sleep(1)
+    for user_id in tqdm(user_ids):
+        reel = instagram.get_user_reel(str(user_id))
+        save_json(
+            timestamp=int(reel.get("expiring_at")),
+            content_type="reel_" + str(user_id),
+            content=reel,
+            prefix=config["json_backup"],
+        )
+        instagram.download_reel(reel)
+        time.sleep(1)
         # else:
         #     ctypes.windll.user32.MessageBoxW(0, "Error Downloading", "instagram-story", 1)
 
+    instagram.close()
+
     logging.warning("Following users were ignored: %s", ", ".join(users_ignored))
-    logging.info("Finished downloading stoeies for user: %s", config["username"])
+    logging.info("Finished downloading stories for user: %s", config["username"])
 
 
 def main():
@@ -267,7 +259,7 @@ def main():
         config_file = default_config_file()
 
     config = get_config(config_file)
-    user_config = config.get("users")
+    user_config = config.get("user_list")
     for user in user_config:
         if user.get("download"):
             download_stories(config=user, download=config.get("include"), options=args)
