@@ -106,3 +106,4 @@ ENV/
 cmd.txt
 
 .test-data/
+config.json
