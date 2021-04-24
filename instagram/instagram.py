@@ -1,9 +1,10 @@
 """Instagram class to handle requests to Instagram"""
-
 import json
-import os
-from datetime import datetime
 import logging
+import os
+import time
+from datetime import datetime
+from http.cookiejar import MozillaCookieJar
 
 import requests
 
@@ -34,8 +35,9 @@ class Instagram:
             "accept-language": "en-US",
             "content_type": "application/x-www-form-urlencoded; charset=UTF-8",
             "cache-control": "no-cache",
-            "cookie": cookie.format(self.userid, self.sessionid,
-                                    self.csrftoken, self.mid),
+            "cookie": cookie.format(
+                self.userid, self.sessionid, self.csrftoken, self.mid
+            ),
             # "pragma" : "no-cache",
             # "referer" : "https://www.instagram.com/",
             "user-agent": (
@@ -59,7 +61,7 @@ class Instagram:
         """
         endpoint = "https://i.instagram.com/api/v1/feed/reels_tray/"
         response = self.session.get(endpoint, timeout=60)
-        if response.status_code != requests.codes.ok: #pylint: disable=no-member
+        if response.status_code != requests.codes.ok:  # pylint: disable=no-member
             logging.error("Status Code %s Error.", response.status_code)
             response.raise_for_status()
 
@@ -75,13 +77,12 @@ class Instagram:
             Response object with reel media API response
         """
         endpoint = (
-            "https://i.instagram.com/api/v1/feed/user/" +
-            str(user) + "/reel_media/"
+            "https://i.instagram.com/api/v1/feed/user/" + str(user) + "/reel_media/"
         )
         response = self.session.get(endpoint, timeout=60)
-        if response.status_code != requests.codes.ok: #pylint: disable=no-member
+        if response.status_code != requests.codes.ok:  # pylint: disable=no-member
             logging.error("Status Code %s Error.", response.status_code)
-            response.raise_for_status()
+            return False
         return response
 
     def get_user_stories(self):
@@ -121,11 +122,16 @@ class Instagram:
                 if "pk" in user["user"]:
                     user_id = user["user"]["pk"]
                     if user_id not in download:
-                        users.append('{} ({})'.format(user["user"]["username"], user_id))
+                        users.append(
+                            "{} ({})".format(user["user"]["username"], user_id)
+                        )
         return users
 
     def history_save_filenames(self, string):
-        with open(os.environ['HOME'] + "/.instagram-story/cache.txt", "a+") as archive:
+        filename = self.format_time(time.time(), "cache-%Y-%m-%d_%H.log")
+        with open(
+            os.path.join(os.environ["HOME"], ".instagram-story", filename), "a+"
+        ) as archive:
             archive.write(string + "\n")
 
     def download_file(self, url: str, dest: str):
@@ -152,7 +158,9 @@ class Instagram:
             os.makedirs(dirpath, exist_ok=True)
             with open(dest, "xb") as handle:
                 response = self.session.get(url, stream=True, timeout=160)
-                if response.status_code != requests.codes.ok: #pylint: disable=no-member
+                if (
+                    response.status_code != requests.codes.ok
+                ):  # pylint: disable=no-member
                     logging.error("Status Code %s Error.", response.status_code)
                     response.raise_for_status()
                 for data in response.iter_content(chunk_size=4194304):
@@ -173,14 +181,15 @@ class Instagram:
     def format_time(self, timestamp, time_fmt):
         return datetime.utcfromtimestamp(timestamp).strftime(time_fmt)
 
-    def format_filepath(self,
-                        user: str,
-                        pk: int,
-                        timestamp: int,
-                        post_id: str,
-                        media_type: int,
-                        content: dict,
-                        ) -> str:
+    def format_filepath(
+        self,
+        user: str,
+        pk: int,
+        timestamp: int,
+        post_id: str,
+        media_type: int,
+        content: dict,
+    ) -> str:
         """Format download path to a specific format/template
 
         Args:
@@ -219,8 +228,7 @@ class Instagram:
             f.close()
 
         path = os.path.join(
-            self.media_directory, str(pk), utcyear,
-            utcdatetime + " " + post_id + ext
+            self.media_directory, str(pk), utcyear, utcdatetime + " " + post_id + ext
         )
 
         return path

@@ -45,6 +45,7 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
+.pytest_cache/
 
 # Translations
 *.mo
@@ -99,15 +100,9 @@ ENV/
 
 # mypy
 .mypy_cache/
-*.json
 
-log.txt
-json/
-config.json
-organize.rb
-run.bat
-/story
-Pipfile.lock
-build.bat
-instagram-story_cache.txt
-23.py
+# IDE settings
+.vscode/
+cmd.txt
+
+.test-data/
