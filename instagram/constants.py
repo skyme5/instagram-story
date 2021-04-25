@@ -25,5 +25,6 @@ WARNING_IGNORED = "Following users were ignored: %s"
 
 ENDPOINT_REELS_TRAY = "https://i.instagram.com/api/v1/feed/reels_tray/"
 ENDPOINT_USER_REELS = "https://i.instagram.com/api/v1/feed/reels_media/?reel_ids="
+ENDPOINT_USER_REELS_PREFIX = "https://i.instagram.com/api/v1/feed/reels_media/?{}"
 
 MEDIA_TYPE_EXT = ["", ".jpg", ".mp4", ".json"]

@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import time
 from datetime import datetime
@@ -11,6 +12,9 @@ from .constants import USER_ASK_COOKIE
 from .constants import USER_ASK_DIRECTORY
 from .constants import USER_ASK_USER_ID
 from .constants import USER_ASK_USERNAME
+
+
+log = logging.getLogger(__name__)
 
 
 def format_time(time_stamp, time_fmt):
@@ -65,6 +69,7 @@ def dump_text_file(content: str, filepath: str):
     os.makedirs(dirpath, exist_ok=True)
 
     if not os.path.isfile(filepath):
+        log.debug("File written: %s", filepath)
         with open(filepath, "w+") as f:
             f.write(content)
 

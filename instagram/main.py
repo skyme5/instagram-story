@@ -110,16 +110,26 @@ def download_stories(config: dict, download_ids: list, options: dict):
         )
     )
 
-    for user_id in tqdm(users_to_download):
-        reel = instagram.get_reel(user_id)
-        dump_response(
-            timestamp=int(reel.get("expiring_at")),
-            content_type="reel_{}".format(user_id),
-            content=reel,
-            prefix=json_backup,
-        )
-        instagram.download_reel(reel)
-        time.sleep(1)
+    def chunks(lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i : i + n]
+
+    with tqdm(total=len(users_to_download)) as pbar:
+        for user_ids in chunks(users_to_download, 8):
+            reels_chunk = instagram.get_reel_chunk(user_ids)
+            for user_id in user_ids:
+                if user_id in reels_chunk:
+                    reel = reels_chunk.get(user_id)
+                    dump_response(
+                        timestamp=int(reel.get("expiring_at")),
+                        content_type="user_reel_{}".format(user_id),
+                        content=reel,
+                        prefix=json_backup,
+                    )
+                    instagram.download_reel(reel)
+                    time.sleep(1)
+                    pbar.update(1)
         # else:
         #     ctypes.windll.user32.MessageBoxW(0, "Error Downloading", "instagram-story", 1)
 

@@ -10,6 +10,7 @@ import requests
 
 from .constants import ENDPOINT_REELS_TRAY
 from .constants import ENDPOINT_USER_REELS
+from .constants import ENDPOINT_USER_REELS_PREFIX
 from .constants import MEDIA_TYPE_EXT
 from .utils import dump_text_file
 from .utils import format_time
@@ -81,13 +82,35 @@ class Instagram:
         self.reels_tray = self._api_request(ENDPOINT_REELS_TRAY).json()
         return self.reels_tray
 
+    def _reel_cached(self, user_id: str):
+        reel = [
+            a
+            for a in self.reels_tray["tray"]
+            if user_id == str(a["id"]) and a["prefetch_count"] > 0
+        ]
+        return reel
+
     def get_reel(self, user_id: str):
         """Get reel tray from Instagram API.
 
         Returns: Reel tray response object
         """
+        cached = self._reel_cached(user_id)
+        if len(cached) > 0:
+            return cached[0]
+
         response = self._api_request(ENDPOINT_USER_REELS + user_id)
         return response.json().get("reels").get(user_id)
+
+    def get_reel_chunk(self, user_ids: list):
+        """Get reel tray from Instagram API.
+
+        Returns: Reel tray response object
+        """
+        suffix = "&".join(["reel_ids={}".format(a) for a in user_ids])
+
+        response = self._api_request(ENDPOINT_USER_REELS_PREFIX.format(suffix))
+        return response.json().get("reels")
 
     def user_ids(self) -> list:
         """Extract user IDs from reel tray JSON.
