@@ -93,7 +93,7 @@ def download_stories(config: dict, download_ids: list, options: dict):
 
     dump_response(
         timestamp=int(time.time()),
-        content_type="tray",
+        content_type="tray_{}".format(config["user_id"]),
         content=reels_tray,
         prefix=json_backup,
     )
