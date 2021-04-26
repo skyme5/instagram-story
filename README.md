@@ -28,7 +28,7 @@
     </a>
     <a href="https://pepy.tech/project/instagram-story">
       <img
-        src="https://static.pepy.tech/badge/instagram-story"
+        src="https://pepy.tech/badge/instagram-story"
         alt="Monthly Downloads"
       />
     </a>
