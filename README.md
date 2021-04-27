@@ -65,6 +65,8 @@ optional arguments:
                         Download stories for user id listed in the file.
 ```
 
+## Options
+
 On first run, a config file will be generated. The script will ask for required information such as your username, user id, cookies etc., cookies can be obtained from the developer tools of Google Chrome or Firefox.
 
 For exporting cookies you can install the [EditThisCooki](http://www.editthiscookie.com/) extension and follow [this guide](http://www.editthiscookie.com/blog/2014/03/import-export-cookies/) for exporting cookies in comma-separated format. (For this you need to set `Extension->Settings->Options->Choose the preferred export format for cookies`->`Semicolon separated name=value pairs`).
@@ -76,6 +78,10 @@ csrftoken=value;ds_user_id=value;ig_did=value;ig_nrcb=value;mid=value;rur=value;
 Value of `ds_user_id` is your instagram user id.
 
 To periodically obtain stories from followed users, run this script at least every 24 hours. A Windows Scheduled Task or a Unix cron job is recommended to perform this automatically.
+
+### Download only selected users
+
+There is a options to download only user ids listed in `include.txt` text file. If the option `-d` or `--download-only` and points to a valid text file with list of user ids then the story will be downloaded for only those id listed in this file.
 
 ## Example
 
