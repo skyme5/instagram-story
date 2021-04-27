@@ -49,18 +49,18 @@ def init_user_config():
     exit()
 
 
-def get_include_list() -> list:
-    if os.path.isfile(home_path(CONFIG_PATH_INCLUDE)):
+def get_include_list(download_only) -> list:
+    if os.path.isfile(download_only):
         try:
-            with open(home_path(CONFIG_PATH_INCLUDE)) as f:
+            with open(download_only) as f:
                 return f.read().split("\n")
-        except IOError:
+        except:
             return []
 
     return []
 
 
-def read_config(config_file: str) -> dict:
+def read_config(config_file: str, download_only: str) -> dict:
     if not os.path.isfile(config_file):
         init_user_config()
 
@@ -68,7 +68,10 @@ def read_config(config_file: str) -> dict:
         with open(config_file) as f:
             json_data = json.load(f)
             if config_validator(json_data):
-                config = {"user_list": json_data, "include": get_include_list()}
+                config = {
+                    "user_list": json_data,
+                    "include": get_include_list(download_only),
+                }
                 return config
             else:
                 raise Exception("json_data validate error")
@@ -102,7 +105,12 @@ def download_stories(config: dict, download_ids: list, options: dict):
     log.info(INFO_REEL_FOUND, len(reels_tray["tray"]), username)
 
     user_ids_with_reel = instagram.user_ids()
-    users_to_download = [a for a in user_ids_with_reel if a in download_ids]
+
+    if len(download_ids) > 0:
+        users_to_download = [a for a in user_ids_with_reel if a in download_ids]
+    else:
+        users_to_download = user_ids_with_reel
+
     users_ignored = instagram.ignored_users(download_ids)
 
     print(
@@ -147,6 +155,7 @@ def main():
         "-f",
         "--config-location",
         type=str,
+        default=home_path(CONFIG_PATH_JSON),
         help="Path for loading and storing config key file. "
         "Defaults to " + home_path(CONFIG_PATH_JSON),
     )
@@ -154,6 +163,7 @@ def main():
         "-d",
         "--download-only",
         type=str,
+        default=home_path(CONFIG_PATH_INCLUDE),
         help="Download stories listed in the file. "
         "Defaults to " + home_path(CONFIG_PATH_INCLUDE),
     )
@@ -161,8 +171,9 @@ def main():
     args = parser.parse_args()
 
     config_filepath = args.config_location or home_path(CONFIG_PATH_JSON)
+    download_only = args.download_only
 
-    config = read_config(config_filepath)
+    config = read_config(config_filepath, download_only)
 
     for user in config.get("user_list"):
         downlaod_ids = config.get("include")
