@@ -65,7 +65,9 @@ optional arguments:
                         Download stories for user id listed in the file.
 ```
 
-On first run, a config file will be generated. The script will ask for required information such as your username, user id, cookies etc., cookies can be obtained from the developer tools of Google Chrome or Firefox. For this you can install the [EditThisCooki](http://www.editthiscookie.com/) extension and export your instagram cookie in comma separated values
+On first run, a config file will be generated. The script will ask for required information such as your username, user id, cookies etc., cookies can be obtained from the developer tools of Google Chrome or Firefox.
+
+For exporting cookies you can install the [EditThisCooki](http://www.editthiscookie.com/) extension and follow [this guide](http://www.editthiscookie.com/blog/2014/03/import-export-cookies/) for exporting cookies in comma-separated format. (For this you need to set `Extension->Settings->Options->Choose the preferred export format for cookies`->`Semicolon separated name=value pairs`).
 
 ```text
 csrftoken=value;ds_user_id=value;ig_did=value;ig_nrcb=value;mid=value;rur=value;sessionid=value;shbid=value;shbts=value;
@@ -74,6 +76,18 @@ csrftoken=value;ds_user_id=value;ig_did=value;ig_nrcb=value;mid=value;rur=value;
 Value of `ds_user_id` is your instagram user id.
 
 To periodically obtain stories from followed users, run this script at least every 24 hours. A Windows Scheduled Task or a Unix cron job is recommended to perform this automatically.
+
+## Example
+
+```text
+E:\>instagram-story
+Enter your instagram username: instagrm-test
+Enter your instagram user id: 501517166
+Enter your instagram cookie: ig_did=52FED55D-4C3E-408F-997C-803D6385D39A; mid=c1e513b4990f_94603666c341ef61; csrftoken=AR6+5nk3N0S3xkTrRc9Pfg; ds_user_id=501517166; sessionid=501517166%3A94603666c341ef61%2a1; shbid=2051; shbts=1619505936.8752491; rur=ARN
+Enter directory for saving media files (defaults to directory): B:\story
+Config created at: C:\msys64\home\me\.instagram-story\config.json
+Run again to download stories
+```
 
 ## Legal Disclaimer
 

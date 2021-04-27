@@ -34,17 +34,19 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
+log = logging.getLogger(__name__)
 
 
 def init_user_config():
-    logging.info("Creating config file")
-    config = [ask_user_for_input]
-    logging.info("Saving config.")
+    log.info("Config created at: {}".format(home_path(CONFIG_PATH_JSON)))
+    config = [ask_user_for_input()]
 
     with open(home_path(CONFIG_PATH_JSON), "tw+") as f:
         json.dump(config, f)
 
-    return config
+    print("Config created at: {}".format(home_path(CONFIG_PATH_JSON)))
+    print("Run again to download stories")
+    exit()
 
 
 def get_include_list() -> list:
@@ -59,26 +61,25 @@ def get_include_list() -> list:
 
 
 def read_config(config_file: str) -> dict:
-    if os.path.isfile(config_file):
-        try:
-            with open(config_file) as f:
-                json_data = json.load(f)
-                if config_validator(json_data):
-                    config = {"user_list": json_data, "include": get_include_list()}
-                    return config
-                else:
-                    raise Exception("json_data validate error")
+    if not os.path.isfile(config_file):
+        init_user_config()
 
-        except IOError:
-            raise Exception(f"unable to read {config_file}")
+    try:
+        with open(config_file) as f:
+            json_data = json.load(f)
+            if config_validator(json_data):
+                config = {"user_list": json_data, "include": get_include_list()}
+                return config
+            else:
+                raise Exception("json_data validate error")
 
-        except json.decoder.JSONDecodeError:
-            raise Exception(
-                f"unable to parse {config_file} as json",
-            )
-    else:
-        logger.info("Creating {} file in the current directory", config_file)
-        return ask_user_config()
+    except IOError:
+        raise Exception(f"unable to read {config_file}")
+
+    except json.decoder.JSONDecodeError:
+        raise Exception(
+            f"unable to parse {config_file} as json",
+        )
 
 
 def download_stories(config: dict, download_ids: list, options: dict):
@@ -87,18 +88,18 @@ def download_stories(config: dict, download_ids: list, options: dict):
 
     instagram = Instagram(config, options)
 
-    logging.info(INFO_FETCHING_FOR, username)
+    log.info(INFO_FETCHING_FOR, username)
 
     reels_tray = instagram.get_tray()
 
     dump_response(
         timestamp=int(time.time()),
-        content_type="tray_{}".format(config["user_id"]),
+        content_type="tray_{}".format(config["id"]),
         content=reels_tray,
         prefix=json_backup,
     )
 
-    logging.info(INFO_REEL_FOUND, len(reels_tray["tray"]), username)
+    log.info(INFO_REEL_FOUND, len(reels_tray["tray"]), username)
 
     user_ids_with_reel = instagram.user_ids()
     users_to_download = [a for a in user_ids_with_reel if a in download_ids]
@@ -135,8 +136,8 @@ def download_stories(config: dict, download_ids: list, options: dict):
 
     instagram.close()
 
-    logging.warning(WARNING_IGNORED, ", ".join(users_ignored))
-    logging.info(INFO_FINISH_DOWNLOADING, username)
+    log.warning(WARNING_IGNORED, ", ".join(users_ignored))
+    log.info(INFO_FINISH_DOWNLOADING, username)
 
 
 def main():
@@ -168,7 +169,7 @@ def main():
         if user.get("download"):
             download_stories(user, downlaod_ids, args)
 
-    logging.info(INFO_ALL_DONE)
+    log.info(INFO_ALL_DONE)
 
 
 if __name__ == "__main__":

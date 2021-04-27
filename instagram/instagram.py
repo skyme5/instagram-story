@@ -66,20 +66,25 @@ class Instagram:
         Returns: Reel tray response object
         """
         self.log.debug("Making API request %s", endpoint)
-        response = self.session.get(endpoint, timeout=60)
-        if response.status_code != requests.codes.ok:  # pylint: disable=no-member
-            self.log.error(
-                "Status Code %s Error for %s.", response.status_code, endpoint
-            )
-            response.raise_for_status()
-        return response
+        try:
+            response = self.session.get(endpoint, timeout=60)
+            if response.status_code != requests.codes.ok:  # pylint: disable=no-member
+                self.log.error(
+                    "Status Code %s Error for %s.", response.status_code, endpoint
+                )
+                response.raise_for_status()
+            return response.json()
+        except json.decoder.JSONDecodeError:
+            raise ValueError("Error parsing json response")
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError("Connection closed by server")
 
     def get_tray(self):
         """Get reel tray from Instagram API.
 
         Returns: Reel tray response object
         """
-        self.reels_tray = self._api_request(ENDPOINT_REELS_TRAY).json()
+        self.reels_tray = self._api_request(ENDPOINT_REELS_TRAY)
         return self.reels_tray
 
     def _reel_cached(self, user_id: str):
@@ -100,7 +105,7 @@ class Instagram:
             return cached[0]
 
         response = self._api_request(ENDPOINT_USER_REELS + user_id)
-        return response.json().get("reels").get(user_id)
+        return response.get("reels").get(user_id)
 
     def get_reel_chunk(self, user_ids: list):
         """Get reel tray from Instagram API.
@@ -110,7 +115,7 @@ class Instagram:
         suffix = "&".join(["reel_ids={}".format(a) for a in user_ids])
 
         response = self._api_request(ENDPOINT_USER_REELS_PREFIX.format(suffix))
-        return response.json().get("reels")
+        return response.get("reels")
 
     def user_ids(self) -> list:
         """Extract user IDs from reel tray JSON.

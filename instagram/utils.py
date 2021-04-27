@@ -52,6 +52,9 @@ def filepath_logging():
     """
     filedir = ".instagram-story"
     filename = "instagram-story-%Y-%m-%d_%H-%M-%S.log"
+
+    dirpath = home_path(filedir)
+    os.makedirs(dirpath, exist_ok=True)
     return format_time(time.time(), home_path(filedir, filename))
 
 
@@ -82,9 +85,9 @@ def ask_user_for_input():
     return {
         "username": username,
         "id": user_id,
-        "directory": directory,
+        "media_directory": directory,
         "json_backup": os.path.join(directory, "json"),
-        "download": true,
+        "download": True,
         "headers": {"cookie": cookie},
     }
 
@@ -110,7 +113,7 @@ def config_validator(data: dict):
                     },
                 },
                 "username": {"type": "string"},
-                "directory": {"type": "string"},
+                "media_directory": {"type": "string"},
                 "json_backup": {"type": "string"},
                 "download": {"type": "boolean"},
             },
