@@ -4,7 +4,6 @@ import logging
 import os
 import pickle
 import time
-from datetime import datetime
 
 import requests
 
@@ -79,11 +78,8 @@ class Instagram:
         except requests.exceptions.ConnectionError:
             raise ConnectionError("Connection closed by server")
 
-    def get_tray(self):
-        """Get reel tray from Instagram API.
-
-        Returns: Reel tray response object
-        """
+    def get_tray(self) -> dict:
+        """Get reel tray from Instagram API."""
         self.reels_tray = self._api_request(ENDPOINT_REELS_TRAY)
         return self.reels_tray
 
@@ -95,10 +91,14 @@ class Instagram:
         ]
         return reel
 
-    def get_reel(self, user_id: str):
-        """Get reel tray from Instagram API.
+    def get_reel(self, user_id: str) -> dict:
+        """Fetch reel tray from Instagram API.
 
-        Returns: Reel tray response object
+        Args:
+            user_id (str): Instagram User Id
+
+        Returns:
+            [dict]: User Reel
         """
         cached = self._reel_cached(user_id)
         if len(cached) > 0:
@@ -107,10 +107,13 @@ class Instagram:
         response = self._api_request(ENDPOINT_USER_REELS + user_id)
         return response.get("reels").get(user_id)
 
-    def get_reel_chunk(self, user_ids: list):
-        """Get reel tray from Instagram API.
+    def get_reel_chunk(self, user_ids: list) -> list:
+        """Get reel tray for a list of user_id from Instagram API.
 
-        Returns: Reel tray response object
+        Args:
+            user_ids ([str]): List of Instagram User Id
+
+        Returns: Reel Tray
         """
         suffix = "&".join(["reel_ids={}".format(a) for a in user_ids])
 
@@ -204,17 +207,13 @@ class Instagram:
         user_id: int,
         timestamp: int,
         post_id: str,
-        media_type: int,
-        content: dict,
     ) -> str:
-        """Format download path to a specific format/template
+        """Format filepath.
 
         Args:
-            user: User name
             user_id: User ID
             timestamp: UTC Unix timestamp
             post_id: Post ID
-            media_type: Media type as defined by IG
 
         Returns:
             None
@@ -223,19 +222,10 @@ class Instagram:
         utcdatetime = format_time(timestamp, time_fmt="%Y-%m-%d_%H-%M-%S")
         utcyear = format_time(timestamp, time_fmt="%Y")
 
-        ext = MEDIA_TYPE_EXT[media_type]
         path_prefix = os.path.join(self.directory, str(user_id), utcyear)
+        filename = "{} {}".format(utcdatetime, post_id)
 
-        json_filepath = os.path.join(
-            path_prefix, "{} {}.json".format(utcdatetime, post_id)
-        )
-
-        dump_text_file(json.dumps(content), json_filepath)
-
-        filename = "{} {}{}".format(utcdatetime, post_id, ext)
-        path = os.path.join(path_prefix, filename)
-
-        return path
+        return os.path.join(path_prefix, filename)
 
     def download_reel(self, tray):
         """Download story from tray.
@@ -244,29 +234,31 @@ class Instagram:
             tray: Reel response object from API.
         """
 
-        username = tray["user"]["username"]
         user_id = tray["user"]["pk"]
         try:
             for item in tray["items"]:
+                item["user"] = tray["user"]
+
                 post_id = item["id"]
                 timestamp = item["taken_at"]
                 media_type = item["media_type"]
+
                 if media_type == 2:  # Video
                     url = item["video_versions"][0]["url"]
-
                 elif media_type == 1:  # Image
                     url = item["image_versions2"]["candidates"][0]["url"]
-
                 else:  # Unknown
                     url = None
                     pass
 
-                path = self.format_filepath(
-                    user_id, timestamp, post_id, media_type, item
-                )
-                self.download_file(url, path)
+                filepath = self.format_filepath(user_id, timestamp, post_id)
 
-        # JSON 'item' key does not exist for later items in tray as of 6/2/2017
+                media_path = filepath + MEDIA_TYPE_EXT[media_type]
+                json_path = filepath + MEDIA_TYPE_EXT[3]
+
+                dump_text_file(json.dumps(item), json_path)
+                self.download_file(url, media_path)
+
         except KeyError:
             pass
 

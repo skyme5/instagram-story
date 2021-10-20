@@ -1,13 +1,10 @@
 import argparse
-import ctypes
 import json
 import logging
 import os
-import tarfile
+import re
 import time
-from datetime import datetime
 
-from loguru import logger
 from tqdm import tqdm
 
 from .constants import CONFIG_PATH_INCLUDE
@@ -17,14 +14,13 @@ from .constants import INFO_DOWNLOADING
 from .constants import INFO_FETCHING_FOR
 from .constants import INFO_FINISH_DOWNLOADING
 from .constants import INFO_REEL_FOUND
+from .constants import INFO_USER_INCLUDE
 from .constants import WARNING_IGNORED
 from .instagram import Instagram
 from .utils import ask_user_for_input
 from .utils import config_validator
 from .utils import dump_response
-from .utils import dump_text_file
 from .utils import filepath_logging
-from .utils import format_time
 from .utils import home_path
 
 
@@ -53,7 +49,9 @@ def get_include_list(download_only) -> list:
     if os.path.isfile(download_only):
         try:
             with open(download_only) as f:
-                return f.read().split("\n")
+                users = re.findall("^[\d]+", f.read(), re.MULTILINE)
+                log.info(INFO_USER_INCLUDE, len(users))
+                return users
         except:
             return []
 
@@ -130,15 +128,24 @@ def download_stories(config: dict, download_ids: list, options: dict):
             for user_id in user_ids:
                 if user_id in reels_chunk:
                     reel = reels_chunk.get(user_id)
+
+                    username = reel["user"]["username"]
+                    count = reel["media_count"] or len(reel["items"])
+                    pbar.set_description("+{} {} ({})".format(count, username, user_id))
+
                     dump_response(
                         timestamp=int(reel.get("expiring_at")),
                         content_type="user_reel_{}".format(user_id),
                         content=reel,
                         prefix=json_backup,
                     )
+
                     instagram.download_reel(reel)
+
                     time.sleep(1)
                     pbar.update(1)
+        pbar.set_description("")
+        pbar.update(0)
         # else:
         #     ctypes.windll.user32.MessageBoxW(0, "Error Downloading", "instagram-story", 1)
 
@@ -156,7 +163,7 @@ def main():
         "--config-location",
         type=str,
         default=home_path(CONFIG_PATH_JSON),
-        help="Path for loading and storing config key file. "
+        help="Path for loading and storing json config key file. "
         "Defaults to " + home_path(CONFIG_PATH_JSON),
     )
     parser.add_argument(
