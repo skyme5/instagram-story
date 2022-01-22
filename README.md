@@ -14,6 +14,12 @@
         alt="CI"
       />
     </a>
+    <a href="https://www.python.org/">
+      <img
+        src="https://img.shields.io/badge/Made%20with-Python-blue"
+        alt="Made with Python"
+      />
+    </a>
     <a href="https://codecov.io/gh/skyme5/instagram-story">
       <img
         src="https://img.shields.io/pypi/pyversions/instagram-story"
