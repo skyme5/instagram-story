@@ -1,5 +1,4 @@
 jsonschema>=3.1.1
 loguru>=0.2.5
 requests>=2.22.0
-setuptools>=41.4.0
 tqdm>=4.32.1
