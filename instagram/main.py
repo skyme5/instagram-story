@@ -14,6 +14,7 @@ from .constants import INFO_DOWNLOADING
 from .constants import INFO_FETCHING_FOR
 from .constants import INFO_FINISH_DOWNLOADING
 from .constants import INFO_REEL_FOUND
+from .constants import INFO_REEL_FOUND_FOR_USER
 from .constants import INFO_USER_INCLUDE
 from .constants import WARNING_IGNORED
 from .instagram import Instagram
@@ -129,9 +130,10 @@ def download_stories(config: dict, download_ids: list, options: dict):
                 if user_id in reels_chunk:
                     reel = reels_chunk.get(user_id)
 
-                    username = reel["user"]["username"]
+                    name = reel["user"]["username"]
                     count = reel["media_count"] or len(reel["items"])
-                    pbar.set_description("+{} {} ({})".format(count, username, user_id))
+                    pbar.set_description("+{} {} ({})".format(count, name, user_id))
+                    log.info(INFO_REEL_FOUND_FOR_USER, count, name, user_id)
 
                     dump_response(
                         timestamp=int(reel.get("expiring_at")),

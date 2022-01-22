@@ -193,13 +193,13 @@ class Instagram:
 
             self.dump_filename(dest)
         except FileExistsError:
-            self.log.info("File already exists.")
+            self.log.info("File already exists at %s", dest)
         # This is the correct syntax
         except requests.exceptions.RequestException:
             self.log.info("Connection was closed")
 
         if os.path.getsize(dest) == 0:
-            self.log.info("Error downloading. Removing.")
+            self.log.info("Error downloading. Removing %s", dest)
             os.remove(dest)
 
     def format_filepath(

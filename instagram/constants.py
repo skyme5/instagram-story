@@ -23,6 +23,7 @@ INFO_DOWNLOADING = "Downloading stories for {} ({}/{})"
 INFO_FETCHING_FOR = "Fetching stories for user: %s"
 INFO_FINISH_DOWNLOADING = "Finished downloading stories for user: %s"
 INFO_REEL_FOUND = "Found %s stories for user: %s"
+INFO_REEL_FOUND_FOR_USER = "Found %s stories for %s (%s)"
 INFO_USER_INCLUDE = "Found %s users in include.txt"
 
 WARNING_IGNORED = "Following users were ignored: %s"
