@@ -1,4 +1,4 @@
-* Snapchat Downloader version:
+* instagram-story version:
 * Python version:
 * Operating System:
 
